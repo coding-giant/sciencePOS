@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Duka Ledger</title>
+<style>
+  :root {
+    --bg: #F4F6F4;
+    --surface: #FFFFFF;
+    --surface-2: #ECEFEB;
+    --border: #D9DED6;
+    --text: #172420;
+    --text-muted: #5C6B62;
+    --accent: #1F6F5C;
+    --accent-dark: #165445;
+    --accent-contrast: #FFFFFF;
+    --warn: #B0620E;
+    --warn-bg: #FBEEDD;
+    --danger: #B3261E;
+    --danger-bg: #FBEAE8;
+    --success-bg: #E7F2EC;
+    --radius: 12px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101512;
+      --surface: #182019;
+      --surface-2: #1E2721;
+      --border: #2B362E;
+      --text: #E7EEE9;
+      --text-muted: #94A69C;
+      --accent: #3E9C82;
+      --accent-dark: #2E7A66;
+      --accent-contrast: #08120E;
+      --warn: #E0A253;
+      --warn-bg: #382A16;
+      --danger: #E17167;
+      --danger-bg: #3A1E1B;
+      --success-bg: #17301F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #101512;
+    --surface: #182019;
+    --surface-2: #1E2721;
+    --border: #2B362E;
+    --text: #E7EEE9;
+    --text-muted: #94A69C;
+    --accent: #3E9C82;
+    --accent-dark: #2E7A66;
+    --accent-contrast: #08120E;
+    --warn: #E0A253;
+    --warn-bg: #382A16;
+    --danger: #E17167;
+    --danger-bg: #3A1E1B;
+    --success-bg: #17301F;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app { max-width: 560px; margin: 0 auto; min-height: 100vh; display:flex; flex-direction:column; }
+
+  header.topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top:0; z-index: 5;
+  }
+  header.topbar .brand { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+  header.topbar .brand small { display:block; font-weight:500; font-size:11px; color: var(--text-muted); }
+  header.topbar button.ghost {
+    background:none; border: 1px solid var(--border); color: var(--text);
+    padding: 7px 12px; border-radius: 999px; font-size: 13px; cursor:pointer;
+  }
+
+  main { flex:1; padding: 16px; padding-bottom: 90px; overflow-x:hidden; }
+
+  /* ---- role select ---- */
+  .role-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height: 88vh; gap: 28px; text-align:center; padding: 24px;}
+  .role-screen h1 { font-size: 26px; margin: 0; letter-spacing: -0.02em; }
+  .role-screen p.tag { color: var(--text-muted); margin: 4px 0 0; font-size: 14px;}
+  .role-buttons { display:flex; flex-direction:column; gap: 14px; width: 100%; max-width: 320px; }
+  .role-btn {
+    padding: 20px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--surface); cursor:pointer; text-align:left; display:flex; align-items:center; gap:14px;
+  }
+  .role-btn .glyph { font-size: 26px; width:40px; text-align:center; }
+  .role-btn .label { font-weight:700; font-size:16px; }
+  .role-btn .sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .role-btn:active { background: var(--surface-2); }
+
+  /* ---- generic ---- */
+  .card {
+    background: var(--surface); border:1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; margin-bottom: 12px;
+  }
+  .row { display:flex; gap:10px; }
+  .row > * { flex:1; }
+  label.field { display:block; font-size:12px; color:var(--text-muted); margin-bottom:4px; margin-top:10px; }
+  input, select {
+    width:100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-size: 15px; font-family: var(--sans);
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn {
+    padding: 12px 16px; border-radius: 8px; border: none; font-size: 15px; font-weight:600;
+    cursor:pointer; width:100%;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-contrast); }
+  .btn-primary:active { background: var(--accent-dark); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-danger { background: var(--danger-bg); color: var(--danger); }
+  .btn-sm { width:auto; padding: 7px 12px; font-size: 13px; }
+  .pill { display:inline-block; padding: 2px 9px; border-radius:999px; font-size:11px; font-weight:600; }
+  .pill-ok { background: var(--success-bg); color: var(--accent); }
+  .pill-warn { background: var(--warn-bg); color: var(--warn); }
+  .pill-danger { background: var(--danger-bg); color: var(--danger); }
+
+  .tabs { display:flex; gap:6px; margin-bottom: 14px; background: var(--surface-2); padding:4px; border-radius: 999px; overflow-x:auto; }
+  .tabs button {
+    flex: 0 0 auto; padding: 9px 14px; border-radius: 999px; border:none; background:transparent;
+    color: var(--text-muted); font-size: 13px; font-weight:600; cursor:pointer; white-space:nowrap;
+  }
+  .tabs button.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .item-row { display:flex; justify-content:space-between; align-items:center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px; }
+  .item-row:last-child { border-bottom:none; }
+  .item-name { font-weight:600; font-size:14px; }
+  .item-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .item-actions { display:flex; gap:6px; }
+  .icon-btn { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:6px 9px; font-size:13px; cursor:pointer; color:var(--text); }
+
+  .empty { text-align:center; color: var(--text-muted); padding: 30px 10px; font-size: 14px; }
+
+  /* ---- cashier grid ---- */
+  .product-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 90px; }
+  .product-tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 12px; text-align:left; cursor:pointer;
+  }
+  .product-tile:active { background: var(--surface-2); }
+  .product-tile.disabled { opacity:.45; }
+  .product-tile .pname { font-weight:700; font-size:14px; margin-bottom:6px; line-height:1.25;}
+  .product-tile .pprice { font-family: var(--mono); font-size: 14px; color: var(--accent); }
+  .product-tile .pstock { font-size:11px; color:var(--text-muted); margin-top:4px; }
+
+  .cart-bar {
+    position: fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:560px;
+    background: var(--surface); border-top:1px solid var(--border); padding: 10px 14px;
+    box-shadow: 0 -4px 14px rgba(0,0,0,.06);
+  }
+  .cart-summary { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:13px; color:var(--text-muted); }
+  .cart-summary strong { color: var(--text); font-size:16px; font-family: var(--mono); }
+
+  .modal-backdrop { position:fixed; inset:0; background: rgba(0,0,0,.45); display:flex; align-items:flex-end; z-index:20; }
+  .modal-sheet {
+    background: var(--surface); width:100%; max-width:560px; margin:0 auto; border-radius: 18px 18px 0 0;
+    padding: 18px; max-height: 85vh; overflow-y:auto;
+  }
+  .modal-sheet h3 { margin: 0 0 10px; font-size:17px; }
+  .modal-close { display:flex; justify-content:flex-end; margin-bottom: -6px; }
+  .modal-close button { background:none; border:none; font-size:20px; color:var(--text-muted); cursor:pointer; }
+
+  .cart-line { display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom:1px solid var(--border); gap:8px;}
+  .cart-line:last-child { border-bottom:none; }
+  .qty-stepper { display:flex; align-items:center; gap:8px; }
+  .qty-stepper button { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2); font-size:15px; cursor:pointer; color:var(--text); }
+
+  .stat-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:14px; }
+  .stat-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .stat-card .label { font-size:11px; color:var(--text-muted); text-transform:none; }
+  .stat-card .value { font-family: var(--mono); font-size:19px; font-weight:700; margin-top:4px; }
+
+  table.report-table { width:100%; border-collapse: collapse; font-size:13px; }
+  table.report-table th { text-align:left; color:var(--text-muted); font-weight:600; font-size:11px; padding: 6px 4px; border-bottom:1px solid var(--border); }
+  table.report-table td { padding: 8px 4px; border-bottom:1px solid var(--border); }
+  table.report-table td.num, table.report-table th.num { text-align:right; font-family: var(--mono); }
+
+  .toast {
+    position: fixed; top: 14px; left:50%; transform:translateX(-50%); z-index:30;
+    background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-size: 13px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  }
+
+  .receipt-preview {
+    font-family: var(--mono); font-size: 12px; white-space: pre-wrap; background: var(--surface-2);
+    border-radius: 8px; padding: 12px; border: 1px dashed var(--border); line-height:1.5;
+  }
+
+  h2.section-title { font-size: 15px; margin: 4px 0 10px; }
+  .muted-note { font-size:12px; color:var(--text-muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+  var STORAGE_KEY = "ledgerpos_data_v1";
+  var LOW_STOCK = 5;
+
+  function defaultData(){
+    return {
+      shopName: "My Shop",
+      pins: { admin: "1234", cashier: "1111" },
+      items: [],
+      sales: [],
+      debts: []
+    };
+  }
+
+  function loadData(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultData();
+      var parsed = JSON.parse(raw);
+      if(!parsed.items) parsed.items = [];
+      if(!parsed.sales) parsed.sales = [];
+      if(!parsed.pins) parsed.pins = { admin:"1234", cashier:"1111" };
+      if(!parsed.shopName) parsed.shopName = "My Shop";
+      if(!parsed.debts) parsed.debts = [];
+      return parsed;
+    } catch(e){
+      console.error("load failed", e);
+      return defaultData();
+    }
+  }
+
+  function saveData(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+    catch(e){ console.error("save failed", e); toast("Could not save — storage full or blocked"); }
+  }
+
+  var DATA = loadData();
+
+  var state = {
+    screen: "role", // role | pinpad | admin | cashier
+    pendingRole: null,
+    adminTab: "stock",
+    reportRange: "today",
+    reportCustomFrom: "",
+    reportCustomTo: "",
+    cart: {}, // itemId -> qty
+    checkoutPayment: { type: "cash", name: "", phone: "" },
+    editingItemId: null,
+    lastReceipt: null
+  };
+
+  function showConfirm(message, onConfirm){
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<p style="margin: 6px 0 16px; font-size:15px;">'+esc(message)+'</p>'+
+      '<div class="row">'+
+        '<button class="btn btn-outline" id="confirmCancelBtn">Cancel</button>'+
+        '<button class="btn btn-danger" id="confirmYesBtn">Confirm</button>'+
+      '</div>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", close);
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
+    backdrop.querySelector("#confirmCancelBtn").addEventListener("click", close);
+    backdrop.querySelector("#confirmYesBtn").addEventListener("click", function(){ close(); onConfirm(); });
+  }
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function money(n){ return (Math.round(n*100)/100).toFixed(2); }
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  function toast(msg){
+    var el = document.createElement("div");
+    el.className = "toast";
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function(){ el.remove(); }, 2200);
+  }
+
+  // ---------------- RawBT printing ----------------
+  function b64EncodeUnicode(str){
+    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1){
+      return String.fromCharCode(parseInt(p1, 16));
+    }));
+  }
+
+  function padRight(s, len){ s = String(s); return s.length >= len ? s.slice(0,len) : s + " ".repeat(len - s.length); }
+  function padLeft(s, len){ s = String(s); return s.length >= len ? s.slice(0,len) : " ".repeat(len - s.length) + s; }
+  function center(s, len){
+    s = String(s);
+    if(s.length >= len) return s.slice(0,len);
+    var total = len - s.length, left = Math.floor(total/2), right = total-left;
+    return " ".repeat(left) + s + " ".repeat(right);
+  }
+  function lineChar(ch, len){ return ch.repeat(len); }
+
+  function buildReceiptText(sale, paymentInfo){
+    var W = 32;
+    var lines = [];
+    lines.push(center(DATA.shopName || "My Shop", W));
+    lines.push(center(new Date(sale.timestamp).toLocaleString(), W));
+    lines.push(lineChar("-", W));
+    sale.lines.forEach(function(l){
+      lines.push(padRight(l.name, W));
+      var qtyPrice = l.qty + " x " + money(l.sellPrice);
+      var lineTotal = money(l.qty * l.sellPrice);
+      lines.push(padRight(qtyPrice, W - 10) + padLeft(lineTotal, 10));
+    });
+    lines.push(lineChar("-", W));
+    lines.push(padRight("TOTAL", W - 10) + padLeft(money(sale.total), 10));
+    if(paymentInfo && paymentInfo.type === "credit"){
+      lines.push("");
+      lines.push(padRight("ON CREDIT", W));
+      lines.push(padRight("Customer: " + paymentInfo.name, W));
+      if(paymentInfo.phone) lines.push(padRight("Phone: " + paymentInfo.phone, W));
+    }
+    lines.push("");
+    lines.push(center("Thank you!", W));
+    lines.push("");
+    lines.push(lineChar("-", W));
+    lines.push(center("Developed by Sakitech", W));
+    lines.push(center("Solutions", W));
+    lines.push(center("0720899482", W));
+    lines.push("");
+    lines.push("");
+    return lines.join("\n");
+  }
+
+  function printText(text){
+    try {
+      var b64 = b64EncodeUnicode(text);
+      window.location.href = "rawbt:base64," + b64;
+    } catch(e){
+      console.error(e);
+      toast("Could not reach RawBT — is it installed?");
+    }
+  }
+
+  function printReceipt(sale, paymentInfo){
+    var text = buildReceiptText(sale, paymentInfo);
+    state.lastReceipt = text;
+    printText(text);
+  }
+
+  // ---------------- auth ----------------
+  function tryPin(role, pin){
+    if(DATA.pins[role] === pin){
+      state.screen = role;
+      state.pendingRole = null;
+      if(role === "admin") state.adminTab = "stock";
+      render();
+    } else {
+      toast("Wrong PIN");
+    }
+  }
+
+  function logout(){
+    state.screen = "role";
+    state.cart = {};
+    render();
+  }
+
+  // ---------------- stock actions ----------------
+  function addOrUpdateItem(data, id){
+    if(id){
+      var item = DATA.items.find(function(i){ return i.id === id; });
+      if(item){ Object.assign(item, data); }
+    } else {
+      DATA.items.push(Object.assign({ id: uid() }, data));
+    }
+    saveData();
+  }
+  function deleteItem(id){
+    DATA.items = DATA.items.filter(function(i){ return i.id !== id; });
+    saveData();
+    render();
+  }
+  function restockItem(id, addQty, newBuy, newSell){
+    var item = DATA.items.find(function(i){ return i.id === id; });
+    if(!item) return;
+    item.qty += addQty;
+    if(!isNaN(newBuy)) item.buyPrice = newBuy;
+    if(!isNaN(newSell)) item.sellPrice = newSell;
+    saveData();
+  }
+
+  function addDebt(data){
+    DATA.debts.push(Object.assign({ id: uid(), paid: 0, createdAt: Date.now(), settled: false }, data));
+    saveData();
+  }
+  function debtBalance(debt){ return Math.max(0, debt.total - debt.paid); }
+  function recordPayment(id, amount){
+    var debt = DATA.debts.find(function(d){ return d.id === id; });
+    if(!debt) return;
+    debt.paid = Math.min(debt.total, debt.paid + amount);
+    debt.settled = debtBalance(debt) <= 0;
+    saveData();
+  }
+  function deleteDebt(id){
+    DATA.debts = DATA.debts.filter(function(d){ return d.id !== id; });
+    saveData();
+    render();
+  }
+
+  // ---------------- cart / sale ----------------
+  function addToCart(id){
+    var item = DATA.items.find(function(i){ return i.id === id; });
+    if(!item || item.qty <= 0) return;
+    var inCart = state.cart[id] || 0;
+    if(inCart >= item.qty){ toast("No more stock left"); return; }
+    state.cart[id] = inCart + 1;
+    render();
+  }
+  function changeCartQty(id, delta){
+    var item = DATA.items.find(function(i){ return i.id === id; });
+    var cur = state.cart[id] || 0;
+    var next = cur + delta;
+    if(next <= 0){ delete state.cart[id]; }
+    else if(item && next > item.qty){ toast("Only " + item.qty + " in stock"); return; }
+    else { state.cart[id] = next; }
+    render();
+  }
+  function cartTotal(){
+    var total = 0;
+    Object.keys(state.cart).forEach(function(id){
+      var item = DATA.items.find(function(i){ return i.id === id; });
+      if(item) total += item.sellPrice * state.cart[id];
+    });
+    return total;
+  }
+  function checkout(paymentInfo){
+    var ids = Object.keys(state.cart);
+    if(ids.length === 0) return;
+    paymentInfo = paymentInfo || { type: "cash" };
+    var lines = [];
+    ids.forEach(function(id){
+      var item = DATA.items.find(function(i){ return i.id === id; });
+      if(!item) return;
+      var qty = state.cart[id];
+      lines.push({ itemId: id, name: item.name, qty: qty, sellPrice: item.sellPrice, buyPrice: item.buyPrice });
+      item.qty -= qty;
+    });
+    var total = lines.reduce(function(s,l){ return s + l.qty*l.sellPrice; }, 0);
+    var profit = lines.reduce(function(s,l){ return s + l.qty*(l.sellPrice - l.buyPrice); }, 0);
+    var sale = { id: uid(), timestamp: Date.now(), lines: lines, total: total, profit: profit, paymentType: paymentInfo.type };
+    DATA.sales.push(sale);
+    if(paymentInfo.type === "credit"){
+      var itemsDesc = lines.map(function(l){ return l.qty + "x " + l.name; }).join(", ");
+      addDebt({
+        name: paymentInfo.name,
+        phone: paymentInfo.phone || "",
+        total: total,
+        note: itemsDesc
+      });
+    }
+    saveData();
+    state.cart = {};
+    state.checkoutPayment = { type: "cash", name: "", phone: "" };
+    printReceipt(sale, paymentInfo);
+    toast(paymentInfo.type === "credit" ? "Credit sale recorded — printing receipt" : "Sale recorded — sending to printer");
+    render();
+  }
+
+  // ---------------- reports ----------------
+  function rangeStart(range){
+    var d = new Date();
+    d.setHours(0,0,0,0);
+    if(range === "today") return d.getTime();
+    if(range === "week") return d.getTime() - 6*24*3600*1000;
+    if(range === "month") return d.getTime() - 29*24*3600*1000;
+    return 0;
+  }
+  function reportBounds(){
+    if(state.reportRange === "custom"){
+      var start = state.reportCustomFrom ? new Date(state.reportCustomFrom + "T00:00:00").getTime() : 0;
+      var end = state.reportCustomTo ? new Date(state.reportCustomTo + "T23:59:59.999").getTime() : Date.now();
+      return { start: start, end: end };
+    }
+    return { start: rangeStart(state.reportRange), end: Date.now() };
+  }
+  function filteredSales(){
+    var bounds = reportBounds();
+    return DATA.sales.filter(function(s){ return s.timestamp >= bounds.start && s.timestamp <= bounds.end; });
+  }
+  function reportSummary(sales){
+    var revenue = 0, cost = 0, profit = 0, count = sales.length;
+    var perItem = {};
+    sales.forEach(function(s){
+      revenue += s.total; profit += s.profit;
+      s.lines.forEach(function(l){
+        cost += l.qty * l.buyPrice;
+        if(!perItem[l.name]) perItem[l.name] = { qty:0, revenue:0, profit:0 };
+        perItem[l.name].qty += l.qty;
+        perItem[l.name].revenue += l.qty*l.sellPrice;
+        perItem[l.name].profit += l.qty*(l.sellPrice-l.buyPrice);
+      });
+    });
+    return { revenue: revenue, cost: cost, profit: profit, count: count, perItem: perItem };
+  }
+
+  // ---------------- render ----------------
+  var app = document.getElementById("app");
+
+  function render(){
+    if(state.screen === "role") return renderRole();
+    if(state.screen === "admin") return renderAdmin();
+    if(state.screen === "cashier") return renderCashier();
+  }
+
+  function renderRole(){
+    app.innerHTML =
+      '<div class="role-screen">'+
+        '<div>'+
+          '<h1>'+esc(DATA.shopName || "My Shop")+'</h1>'+
+          '<p class="tag">Stock &amp; sales, printed straight to your till.</p>'+
+        '</div>'+
+        '<div class="role-buttons">'+
+          '<button class="role-btn" data-role="admin">'+
+            '<span class="glyph">🗂️</span>'+
+            '<span><span class="label">Admin</span><br><span class="sub">Full access: sell, stock &amp; reports</span></span>'+
+          '</button>'+
+          '<button class="role-btn" data-role="cashier">'+
+            '<span class="glyph">🧾</span>'+
+            '<span><span class="label">Cashier</span><br><span class="sub">Make a sale</span></span>'+
+          '</button>'+
+        '</div>'+
+      '</div>';
+    app.querySelectorAll(".role-btn").forEach(function(btn){
+      btn.addEventListener("click", function(){ openPinPad(btn.getAttribute("data-role")); });
+    });
+  }
+
+  function openPinPad(role){
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML =
+      '<div class="modal-sheet">'+
+        '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+        '<h3>Enter '+(role==="admin"?"admin":"cashier")+' PIN</h3>'+
+        '<input type="password" inputmode="numeric" pattern="[0-9]*" id="pinInput" placeholder="PIN" autofocus>'+
+        '<button class="btn btn-primary" style="margin-top:14px;" id="pinGo">Unlock</button>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    var input = backdrop.querySelector("#pinInput");
+    input.focus();
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", close);
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
+    function go(){ tryPin(role, input.value.trim()); close(); }
+    backdrop.querySelector("#pinGo").addEventListener("click", go);
+    input.addEventListener("keydown", function(e){ if(e.key === "Enter") go(); });
+  }
+
+  // ---- ADMIN ----
+  function renderAdmin(){
+    var html = '<header class="topbar">'+
+      '<div class="brand">'+esc(DATA.shopName)+'<small>Admin</small></div>'+
+      '<button class="ghost" id="logoutBtn">Log out</button>'+
+      '</header><main>';
+
+    html += '<div class="tabs">'+
+      tabBtn("sell","Sell")+tabBtn("stock","Stock")+tabBtn("debtors","Debtors")+tabBtn("reports","Reports")+tabBtn("settings","Settings")+
+      '</div>';
+
+    if(state.adminTab === "sell") html += renderProductGridHtml();
+    if(state.adminTab === "stock") html += renderStockTab();
+    if(state.adminTab === "debtors") html += renderDebtorsTab();
+    if(state.adminTab === "reports") html += renderReportsTab();
+    if(state.adminTab === "settings") html += renderSettingsTab();
+
+    html += '</main>';
+    if(state.adminTab === "sell") html += renderCartBarHtml();
+    app.innerHTML = html;
+    wireAdmin();
+    if(state.adminTab === "sell") wireProductGrid();
+  }
+  function tabBtn(id, label){
+    return '<button data-tab="'+id+'" class="'+(state.adminTab===id?"active":"")+'">'+label+'</button>';
+  }
+
+  function renderStockTab(){
+    var html = '<div class="card">'+
+      '<h2 class="section-title">Add stock item</h2>'+
+      '<label class="field">Item name</label><input id="newName" placeholder="e.g. Cooking oil 1L">'+
+      '<div class="row">'+
+        '<div><label class="field">Quantity</label><input id="newQty" type="number" inputmode="numeric" placeholder="0"></div>'+
+        '<div><label class="field">Buying price</label><input id="newBuy" type="number" inputmode="decimal" placeholder="0.00"></div>'+
+        '<div><label class="field">Selling price</label><input id="newSell" type="number" inputmode="decimal" placeholder="0.00"></div>'+
+      '</div>'+
+      '<button class="btn btn-primary" id="addItemBtn" style="margin-top:14px;">Add item</button>'+
+      '</div>';
+
+    html += '<div class="card"><h2 class="section-title">Current stock</h2>';
+    if(DATA.items.length === 0){
+      html += '<div class="empty">No stock items yet. Add your first one above.</div>';
+    } else {
+      DATA.items.forEach(function(item){
+        var pill = item.qty === 0 ? '<span class="pill pill-danger">Out of stock</span>'
+                 : item.qty <= LOW_STOCK ? '<span class="pill pill-warn">Low: '+item.qty+'</span>'
+                 : '<span class="pill pill-ok">'+item.qty+' in stock</span>';
+        html += '<div class="item-row">'+
+          '<div><div class="item-name">'+esc(item.name)+'</div>'+
+          '<div class="item-meta">Buy '+money(item.buyPrice)+' · Sell '+money(item.sellPrice)+' · '+pill+'</div></div>'+
+          '<div class="item-actions">'+
+            '<button class="icon-btn" data-restock="'+item.id+'">Restock</button>'+
+            '<button class="icon-btn" data-edit="'+item.id+'">Edit</button>'+
+            '<button class="icon-btn" data-del="'+item.id+'">Delete</button>'+
+          '</div>'+
+        '</div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderDebtorsTab(){
+    var totalOwed = DATA.debts.reduce(function(s,d){ return s + debtBalance(d); }, 0);
+    var html = '<div class="stat-grid" style="grid-template-columns:1fr;">'+
+      statCard("Total owed to you", money(totalOwed))+
+      '</div>';
+
+    html += '<div class="card"><h2 class="section-title">Who owes you</h2>';
+    var openDebts = DATA.debts.filter(function(d){ return debtBalance(d) > 0; });
+    if(openDebts.length === 0){
+      html += '<div class="empty">No one owes you right now.</div>';
+    } else {
+      openDebts.sort(function(a,b){ return debtBalance(b) - debtBalance(a); }).forEach(function(d){
+        html += '<div class="item-row">'+
+          '<div><div class="item-name">'+esc(d.name)+(d.phone?" · "+esc(d.phone):"")+'</div>'+
+          '<div class="item-meta">Owes '+money(debtBalance(d))+' of '+money(d.total)+(d.note?" · "+esc(d.note):"")+' · '+new Date(d.createdAt).toLocaleDateString()+'</div></div>'+
+          '<div class="item-actions">'+
+            '<button class="icon-btn" data-pay="'+d.id+'">Payment</button>'+
+            '<button class="icon-btn" data-deldebt="'+d.id+'">Delete</button>'+
+          '</div>'+
+        '</div>';
+      });
+    }
+    html += '</div>';
+
+    var settled = DATA.debts.filter(function(d){ return debtBalance(d) <= 0; });
+    if(settled.length > 0){
+      html += '<div class="card"><h2 class="section-title">Settled</h2>';
+      settled.sort(function(a,b){ return b.createdAt - a.createdAt; }).forEach(function(d){
+        html += '<div class="item-row">'+
+          '<div><div class="item-name">'+esc(d.name)+'</div>'+
+          '<div class="item-meta">Paid in full · '+money(d.total)+'</div></div>'+
+          '<button class="icon-btn" data-deldebt="'+d.id+'">Delete</button>'+
+        '</div>';
+      });
+      html += '</div>';
+    }
+    return html;
+  }
+
+  function renderReportsTab(){
+    var sales = filteredSales();
+    var sum = reportSummary(sales);
+    var html = '<div class="tabs" style="margin-bottom:14px;">'+
+      rangeBtn("today","Today")+rangeBtn("week","7 days")+rangeBtn("month","30 days")+rangeBtn("all","All time")+rangeBtn("custom","Custom")+
+      '</div>';
+
+    if(state.reportRange === "custom"){
+      html += '<div class="card">'+
+        '<div class="row">'+
+          '<div><label class="field">From</label><input type="date" id="reportFrom" value="'+esc(state.reportCustomFrom)+'"></div>'+
+          '<div><label class="field">To</label><input type="date" id="reportTo" value="'+esc(state.reportCustomTo)+'"></div>'+
+        '</div>'+
+        '<p class="muted-note">Leave "To" blank to include up to now, or "From" blank to include everything before it.</p>'+
+        '</div>';
+    }
+
+    html += '<div class="stat-grid">'+
+      statCard("Revenue", money(sum.revenue))+
+      statCard("Profit", money(sum.profit))+
+      statCard("Cost of goods", money(sum.cost))+
+      statCard("Sales made", String(sum.count))+
+      '</div>';
+
+    html += '<div class="card"><h2 class="section-title">Items sold</h2>';
+    var names = Object.keys(sum.perItem);
+    if(names.length === 0){
+      html += '<div class="empty">No sales in this period.</div>';
+    } else {
+      html += '<table class="report-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Revenue</th><th class="num">Profit</th></tr></thead><tbody>';
+      names.sort(function(a,b){ return sum.perItem[b].revenue - sum.perItem[a].revenue; }).forEach(function(n){
+        var row = sum.perItem[n];
+        html += '<tr><td>'+esc(n)+'</td><td class="num">'+row.qty+'</td><td class="num">'+money(row.revenue)+'</td><td class="num">'+money(row.profit)+'</td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    html += '<div class="card"><h2 class="section-title">Recent sales</h2>';
+    var recent = sales.slice().reverse().slice(0,25);
+    if(recent.length === 0){
+      html += '<div class="empty">Nothing here yet.</div>';
+    } else {
+      recent.forEach(function(s){
+        html += '<div class="item-row"><div>'+
+          '<div class="item-name">'+money(s.total)+'</div>'+
+          '<div class="item-meta">'+new Date(s.timestamp).toLocaleString()+' · '+s.lines.length+' item(s)</div>'+
+        '</div><span class="pill pill-ok">+'+money(s.profit)+' profit</span></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+  function rangeBtn(id,label){ return '<button data-range="'+id+'" class="'+(state.reportRange===id?"active":"")+'">'+label+'</button>'; }
+  function statCard(label,value){ return '<div class="stat-card"><div class="label">'+label+'</div><div class="value">'+value+'</div></div>'; }
+
+  function renderSettingsTab(){
+    return '<div class="card">'+
+      '<h2 class="section-title">Shop details</h2>'+
+      '<label class="field">Shop name (shown on receipts)</label><input id="shopNameInput" value="'+esc(DATA.shopName)+'">'+
+      '<button class="btn btn-outline" id="saveShopName" style="margin-top:12px;">Save name</button>'+
+      '</div>'+
+      '<div class="card">'+
+      '<h2 class="section-title">Change PINs</h2>'+
+      '<label class="field">Admin PIN</label><input id="adminPinInput" inputmode="numeric" value="'+esc(DATA.pins.admin)+'">'+
+      '<label class="field">Cashier PIN</label><input id="cashierPinInput" inputmode="numeric" value="'+esc(DATA.pins.cashier)+'">'+
+      '<button class="btn btn-outline" id="savePins" style="margin-top:12px;">Save PINs</button>'+
+      '</div>'+
+      '<div class="card">'+
+      '<h2 class="section-title">Printer</h2>'+
+      '<p class="muted-note">Make sure RawBT is installed and your thermal printer is paired in the RawBT app before testing.</p>'+
+      '<button class="btn btn-primary" id="testPrintBtn">Send test print to RawBT</button>'+
+      '</div>'+
+      '<div class="card">'+
+      '<h2 class="section-title">Backup &amp; restore</h2>'+
+      '<p class="muted-note">Your stock and sales are saved on this phone only. Clearing this browser\'s site data will erase them — download a backup file now and then to be safe, and keep it somewhere like Google Drive or WhatsApp\'s saved messages.</p>'+
+      '<button class="btn btn-outline" id="backupBtn">Download backup (.json)</button>'+
+      '<button class="btn btn-outline" id="restoreBtn" style="margin-top:10px;">Restore from backup file</button>'+
+      '<input type="file" id="restoreFileInput" accept="application/json,.json" style="display:none;">'+
+      '</div>';
+  }
+
+  function wireAdmin(){
+    app.querySelector("#logoutBtn").addEventListener("click", logout);
+    app.querySelectorAll("[data-tab]").forEach(function(b){
+      b.addEventListener("click", function(){ state.adminTab = b.getAttribute("data-tab"); render(); });
+    });
+
+    if(state.adminTab === "stock"){
+      app.querySelector("#addItemBtn").addEventListener("click", function(){
+        var name = app.querySelector("#newName").value.trim();
+        var qty = parseFloat(app.querySelector("#newQty").value);
+        var buy = parseFloat(app.querySelector("#newBuy").value);
+        var sell = parseFloat(app.querySelector("#newSell").value);
+        if(!name){ toast("Enter an item name"); return; }
+        if(isNaN(qty) || isNaN(buy) || isNaN(sell)){ toast("Fill in quantity and prices"); return; }
+        addOrUpdateItem({ name: name, qty: qty, buyPrice: buy, sellPrice: sell });
+        render();
+      });
+      app.querySelectorAll("[data-restock]").forEach(function(b){
+        b.addEventListener("click", function(){ openRestockItem(b.getAttribute("data-restock")); });
+      });
+      app.querySelectorAll("[data-edit]").forEach(function(b){
+        b.addEventListener("click", function(){ openEditItem(b.getAttribute("data-edit")); });
+      });
+      app.querySelectorAll("[data-del]").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = b.getAttribute("data-del");
+          showConfirm("Delete this item? This cannot be undone.", function(){ deleteItem(id); });
+        });
+      });
+    }
+
+    if(state.adminTab === "debtors"){
+      app.querySelectorAll("[data-pay]").forEach(function(b){
+        b.addEventListener("click", function(){ openPaymentModal(b.getAttribute("data-pay")); });
+      });
+      app.querySelectorAll("[data-deldebt]").forEach(function(b){
+        b.addEventListener("click", function(){
+          var id = b.getAttribute("data-deldebt");
+          showConfirm("Delete this debtor record? This cannot be undone.", function(){ deleteDebt(id); });
+        });
+      });
+    }
+
+    if(state.adminTab === "reports"){
+      app.querySelectorAll("[data-range]").forEach(function(b){
+        b.addEventListener("click", function(){ state.reportRange = b.getAttribute("data-range"); render(); });
+      });
+      var fromInput = app.querySelector("#reportFrom");
+      var toInput = app.querySelector("#reportTo");
+      if(fromInput) fromInput.addEventListener("change", function(){ state.reportCustomFrom = fromInput.value; render(); });
+      if(toInput) toInput.addEventListener("change", function(){ state.reportCustomTo = toInput.value; render(); });
+    }
+
+    if(state.adminTab === "settings"){
+      app.querySelector("#saveShopName").addEventListener("click", function(){
+        DATA.shopName = app.querySelector("#shopNameInput").value.trim() || "My Shop";
+        saveData(); toast("Saved"); render();
+      });
+      app.querySelector("#savePins").addEventListener("click", function(){
+        DATA.pins.admin = app.querySelector("#adminPinInput").value.trim() || DATA.pins.admin;
+        DATA.pins.cashier = app.querySelector("#cashierPinInput").value.trim() || DATA.pins.cashier;
+        saveData(); toast("PINs updated");
+      });
+      app.querySelector("#testPrintBtn").addEventListener("click", function(){
+        printText(center(DATA.shopName,32)+"\n"+lineChar("-",32)+"\nRawBT test print\n"+new Date().toLocaleString()+"\n\n"+lineChar("-",32)+"\n"+center("Developed by Sakitech",32)+"\n"+center("Solutions",32)+"\n"+center("0720899482",32)+"\n\n\n");
+      });
+      app.querySelector("#backupBtn").addEventListener("click", doBackup);
+      app.querySelector("#restoreBtn").addEventListener("click", function(){
+        app.querySelector("#restoreFileInput").click();
+      });
+      app.querySelector("#restoreFileInput").addEventListener("change", function(e){
+        var file = e.target.files && e.target.files[0];
+        if(!file) return;
+        var reader = new FileReader();
+        reader.onload = function(){
+          try {
+            var parsed = JSON.parse(reader.result);
+            if(!parsed || !Array.isArray(parsed.items) || !Array.isArray(parsed.sales)){
+              toast("That doesn't look like a valid backup file");
+              return;
+            }
+            showConfirm("Restore this backup? It will replace all current stock and sales data on this phone.", function(){
+              DATA = parsed;
+              if(!DATA.pins) DATA.pins = { admin:"1234", cashier:"1111" };
+              if(!DATA.shopName) DATA.shopName = "My Shop";
+              if(!DATA.catalog) DATA.catalog = [];
+              saveData();
+              toast("Backup restored");
+              render();
+            });
+          } catch(err){
+            toast("Could not read that file");
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+  }
+
+  async function doBackup(){
+    var filename = "ledgerpos-backup-" + new Date().toISOString().slice(0,10) + ".json";
+    var jsonText = JSON.stringify(DATA, null, 2);
+
+    var downloads = null;
+    try {
+      if(window.claude && window.claude.use) downloads = await window.claude.use("downloads");
+    } catch(e){ downloads = null; }
+
+    if(downloads){
+      try {
+        await downloads.save({ filename: filename, data: jsonText });
+        toast("Backup saved");
+        return;
+      } catch(e){
+        if(e && e.code === "declined") return;
+        // fall through to plain browser download below
+      }
+    }
+
+    try {
+      var blob = new Blob([jsonText], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+      toast("Backup saved");
+    } catch(e){
+      toast("Backup failed — try again");
+    }
+  }
+
+  function openPaymentModal(id){
+    var debt = DATA.debts.find(function(d){ return d.id === id; });
+    if(!debt) return;
+    var balance = debtBalance(debt);
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<h3>Record payment — '+esc(debt.name)+'</h3>'+
+      '<p class="muted-note">Currently owes '+money(balance)+' (of '+money(debt.total)+' total).</p>'+
+      '<label class="field">Amount paid now</label><input id="payAmount" type="number" inputmode="decimal" placeholder="0.00" autofocus>'+
+      '<button class="btn btn-primary" id="savePaymentBtn" style="margin-top:14px;">Record payment</button>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", function(){ close(); render(); });
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop){ close(); render(); } });
+    backdrop.querySelector("#savePaymentBtn").addEventListener("click", function(){
+      var amount = parseFloat(backdrop.querySelector("#payAmount").value);
+      if(isNaN(amount) || amount <= 0){ toast("Enter an amount"); return; }
+      recordPayment(id, amount);
+      close();
+      toast("Payment recorded");
+      render();
+    });
+  }
+
+  function openRestockItem(id){
+    var item = DATA.items.find(function(i){ return i.id === id; });
+    if(!item) return;
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<h3>Restock '+esc(item.name)+'</h3>'+
+      '<p class="muted-note">Currently '+item.qty+' in stock.</p>'+
+      '<label class="field">Quantity to add</label><input id="restockQty" type="number" inputmode="numeric" placeholder="0" autofocus>'+
+      '<div class="row">'+
+        '<div><label class="field">Buying price</label><input id="restockBuy" type="number" value="'+item.buyPrice+'"></div>'+
+        '<div><label class="field">Selling price</label><input id="restockSell" type="number" value="'+item.sellPrice+'"></div>'+
+      '</div>'+
+      '<p class="muted-note">Prices default to the current ones — change them if this batch cost differently.</p>'+
+      '<button class="btn btn-primary" id="saveRestockBtn" style="margin-top:14px;">Add to stock</button>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", close);
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
+    backdrop.querySelector("#saveRestockBtn").addEventListener("click", function(){
+      var addQty = parseFloat(backdrop.querySelector("#restockQty").value);
+      var newBuy = parseFloat(backdrop.querySelector("#restockBuy").value);
+      var newSell = parseFloat(backdrop.querySelector("#restockSell").value);
+      if(isNaN(addQty) || addQty <= 0){ toast("Enter a quantity to add"); return; }
+      restockItem(id, addQty, newBuy, newSell);
+      close();
+      toast("Stock added");
+      render();
+    });
+  }
+
+  function openEditItem(id){
+    var item = DATA.items.find(function(i){ return i.id === id; });
+    if(!item) return;
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<h3>Edit item</h3>'+
+      '<label class="field">Item name</label><input id="editName" value="'+esc(item.name)+'">'+
+      '<div class="row">'+
+        '<div><label class="field">Quantity</label><input id="editQty" type="number" value="'+item.qty+'"></div>'+
+        '<div><label class="field">Buying price</label><input id="editBuy" type="number" value="'+item.buyPrice+'"></div>'+
+        '<div><label class="field">Selling price</label><input id="editSell" type="number" value="'+item.sellPrice+'"></div>'+
+      '</div>'+
+      '<button class="btn btn-primary" id="saveEditBtn" style="margin-top:14px;">Save changes</button>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", close);
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
+    backdrop.querySelector("#saveEditBtn").addEventListener("click", function(){
+      var name = backdrop.querySelector("#editName").value.trim();
+      var qty = parseFloat(backdrop.querySelector("#editQty").value);
+      var buy = parseFloat(backdrop.querySelector("#editBuy").value);
+      var sell = parseFloat(backdrop.querySelector("#editSell").value);
+      if(!name || isNaN(qty) || isNaN(buy) || isNaN(sell)){ toast("Check the values"); return; }
+      addOrUpdateItem({ name:name, qty:qty, buyPrice:buy, sellPrice:sell }, id);
+      close();
+      render();
+    });
+  }
+
+  // ---- CASHIER ----
+  function renderCashier(){
+    var html = '<header class="topbar">'+
+      '<div class="brand">'+esc(DATA.shopName)+'<small>Cashier</small></div>'+
+      '<button class="ghost" id="logoutBtn">Log out</button>'+
+      '</header><main>';
+
+    html += renderProductGridHtml();
+    html += '</main>';
+    html += renderCartBarHtml();
+
+    app.innerHTML = html;
+    app.querySelector("#logoutBtn").addEventListener("click", logout);
+    wireProductGrid();
+  }
+
+  function renderProductGridHtml(){
+    if(DATA.items.length === 0){
+      return '<div class="empty">No items in stock yet. Ask the admin to add some.</div>';
+    }
+    var html = '<div class="product-grid">';
+    DATA.items.forEach(function(item){
+      var disabled = item.qty <= 0;
+      html += '<button class="product-tile'+(disabled?" disabled":"")+'" data-add="'+item.id+'" '+(disabled?"disabled":"")+'>'+
+        '<div class="pname">'+esc(item.name)+'</div>'+
+        '<div class="pprice">'+money(item.sellPrice)+'</div>'+
+        '<div class="pstock">'+(disabled ? "Out of stock" : item.qty+" left")+'</div>'+
+      '</button>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function renderCartBarHtml(){
+    var cartIds = Object.keys(state.cart);
+    var count = cartIds.reduce(function(s,id){ return s + state.cart[id]; }, 0);
+    if(count === 0) return "";
+    return '<div class="cart-bar">'+
+      '<div class="cart-summary"><span>'+count+' item(s) in cart</span><strong>'+money(cartTotal())+'</strong></div>'+
+      '<button class="btn btn-primary" id="viewCartBtn">Review &amp; checkout</button>'+
+      '</div>';
+  }
+
+  function wireProductGrid(){
+    app.querySelectorAll("[data-add]").forEach(function(b){
+      b.addEventListener("click", function(){ addToCart(b.getAttribute("data-add")); });
+    });
+    var cartBtn = app.querySelector("#viewCartBtn");
+    if(cartBtn) cartBtn.addEventListener("click", openCartModal);
+  }
+
+  function openCartModal(){
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+    var ids = Object.keys(state.cart);
+    var linesHtml = ids.map(function(id){
+      var item = DATA.items.find(function(i){ return i.id === id; });
+      if(!item) return "";
+      var qty = state.cart[id];
+      return '<div class="cart-line">'+
+        '<div><div class="item-name">'+esc(item.name)+'</div><div class="item-meta">'+money(item.sellPrice)+' each</div></div>'+
+        '<div class="qty-stepper">'+
+          '<button data-dec="'+id+'">−</button><span>'+qty+'</span><button data-inc="'+id+'">+</button>'+
+        '</div>'+
+      '</div>';
+    }).join("");
+
+    var pay = state.checkoutPayment;
+    var paymentToggleHtml = '<div class="tabs" style="margin:14px 0 0;">'+
+        '<button data-paytype="cash" class="'+(pay.type==="cash"?"active":"")+'">Cash</button>'+
+        '<button data-paytype="credit" class="'+(pay.type==="credit"?"active":"")+'">On credit</button>'+
+      '</div>';
+    var creditFieldsHtml = "";
+    if(pay.type === "credit"){
+      creditFieldsHtml =
+        '<label class="field">Customer name</label><input id="ccName" value="'+esc(pay.name)+'" placeholder="Customer name">'+
+        '<label class="field">Phone (optional)</label><input id="ccPhone" type="tel" value="'+esc(pay.phone)+'" placeholder="07...">'+
+        '<p class="muted-note">This will be added to Debtors for '+money(cartTotal())+'.</p>';
+    }
+
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<h3>Cart</h3>'+
+      linesHtml+
+      '<div class="cart-summary" style="margin-top:12px;"><span>Total</span><strong>'+money(cartTotal())+'</strong></div>'+
+      paymentToggleHtml+
+      creditFieldsHtml+
+      '<button class="btn btn-primary" id="checkoutBtn" style="margin-top:14px;">Complete sale &amp; print receipt</button>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    function syncPaymentFieldsToState(){
+      if(pay.type === "credit"){
+        var n = backdrop.querySelector("#ccName");
+        var p = backdrop.querySelector("#ccPhone");
+        if(n) pay.name = n.value;
+        if(p) pay.phone = p.value;
+      }
+    }
+    backdrop.querySelector(".modal-close button").addEventListener("click", function(){ close(); render(); });
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop){ close(); render(); } });
+    backdrop.querySelectorAll("[data-inc]").forEach(function(b){
+      b.addEventListener("click", function(){ changeCartQty(b.getAttribute("data-inc"), 1); close(); openCartModal(); });
+    });
+    backdrop.querySelectorAll("[data-dec]").forEach(function(b){
+      b.addEventListener("click", function(){ changeCartQty(b.getAttribute("data-dec"), -1); close(); if(Object.keys(state.cart).length){ openCartModal(); } else { render(); } });
+    });
+    backdrop.querySelectorAll("[data-paytype]").forEach(function(b){
+      b.addEventListener("click", function(){
+        syncPaymentFieldsToState();
+        state.checkoutPayment.type = b.getAttribute("data-paytype");
+        close();
+        openCartModal();
+      });
+    });
+    backdrop.querySelector("#checkoutBtn").addEventListener("click", function(){
+      var paymentInfo = { type: pay.type };
+      if(pay.type === "credit"){
+        var name = backdrop.querySelector("#ccName").value.trim();
+        var phone = backdrop.querySelector("#ccPhone").value.trim();
+        if(!name){ toast("Enter the customer's name for a credit sale"); return; }
+        paymentInfo.name = name;
+        paymentInfo.phone = phone;
+      }
+      checkout(paymentInfo);
+      close();
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
