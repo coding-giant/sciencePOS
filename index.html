@@ -17,6 +17,10 @@
     --accent-contrast: #FFFFFF;
     --warn: #B0620E;
     --warn-bg: #FBEEDD;
+    --stat-blue: #2E6BB0;
+    --stat-purple: #7B4FB5;
+    --stat-blue-bg: #E8F0FA;
+    --stat-purple-bg: #F2EAFA;
     --danger: #B3261E;
     --danger-bg: #FBEAE8;
     --success-bg: #E7F2EC;
@@ -40,6 +44,10 @@
       --danger: #E17167;
       --danger-bg: #3A1E1B;
       --success-bg: #17301F;
+      --stat-blue: #6FA8DC;
+      --stat-purple: #B69EE0;
+      --stat-blue-bg: #16232E;
+      --stat-purple-bg: #251C33;
     }
   }
   :root[data-theme="dark"] {
@@ -57,6 +65,10 @@
     --danger: #E17167;
     --danger-bg: #3A1E1B;
     --success-bg: #17301F;
+    --stat-blue: #6FA8DC;
+    --stat-purple: #B69EE0;
+    --stat-blue-bg: #16232E;
+    --stat-purple-bg: #251C33;
   }
 
   * { box-sizing: border-box; }
@@ -90,9 +102,10 @@
   .role-screen p.tag { color: var(--text-muted); margin: 4px 0 0; font-size: 14px;}
   .role-buttons { display:flex; flex-direction:column; gap: 14px; width: 100%; max-width: 320px; }
   .role-btn {
-    padding: 20px; border-radius: var(--radius); border: 1px solid var(--border);
+    padding: 20px; border-radius: var(--radius); border: 1px solid var(--border); border-left: 5px solid var(--accent);
     background: var(--surface); cursor:pointer; text-align:left; display:flex; align-items:center; gap:14px;
   }
+  .role-btn.cashier-btn { border-left-color: var(--stat-blue); }
   .role-btn .glyph { font-size: 26px; width:40px; text-align:center; }
   .role-btn .label { font-weight:700; font-size:16px; }
   .role-btn .sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
@@ -146,11 +159,27 @@
   .product-tile {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 14px 12px; text-align:left; cursor:pointer;
+    border-left: 5px solid hsl(var(--tile-hue, 165) 55% 45%);
+    background: linear-gradient(0deg, hsl(var(--tile-hue, 165) 55% 96%), hsl(var(--tile-hue, 165) 55% 96%));
   }
-  .product-tile:active { background: var(--surface-2); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .product-tile {
+      background: linear-gradient(0deg, hsl(var(--tile-hue, 165) 30% 17%), hsl(var(--tile-hue, 165) 30% 17%));
+      border-left-color: hsl(var(--tile-hue, 165) 45% 55%);
+    }
+  }
+  :root[data-theme="dark"] .product-tile {
+    background: linear-gradient(0deg, hsl(var(--tile-hue, 165) 30% 17%), hsl(var(--tile-hue, 165) 30% 17%));
+    border-left-color: hsl(var(--tile-hue, 165) 45% 55%);
+  }
+  .product-tile:active { filter: brightness(0.96); }
   .product-tile.disabled { opacity:.45; }
   .product-tile .pname { font-weight:700; font-size:14px; margin-bottom:6px; line-height:1.25;}
-  .product-tile .pprice { font-family: var(--mono); font-size: 14px; color: var(--accent); }
+  .product-tile .pprice { font-family: var(--mono); font-size: 14px; font-weight:700; color: hsl(var(--tile-hue, 165) 55% 32%); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .product-tile .pprice { color: hsl(var(--tile-hue, 165) 60% 72%); }
+  }
+  :root[data-theme="dark"] .product-tile .pprice { color: hsl(var(--tile-hue, 165) 60% 72%); }
   .product-tile .pstock { font-size:11px; color:var(--text-muted); margin-top:4px; }
 
   .cart-bar {
@@ -172,11 +201,12 @@
 
   .cart-line { display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom:1px solid var(--border); gap:8px;}
   .cart-line:last-child { border-bottom:none; }
+  .cart-price-input { width:84px; padding:6px 8px; font-size:13px; font-family: var(--mono); }
   .qty-stepper { display:flex; align-items:center; gap:8px; }
   .qty-stepper button { width:28px; height:28px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2); font-size:15px; cursor:pointer; color:var(--text); }
 
   .stat-grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:14px; }
-  .stat-card { background: var(--surface); border:1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .stat-card { background: var(--surface); border:1px solid var(--border); border-top-width:3px; border-radius: var(--radius); padding: 12px; }
   .stat-card .label { font-size:11px; color:var(--text-muted); text-transform:none; }
   .stat-card .value { font-family: var(--mono); font-size:19px; font-weight:700; margin-top:4px; }
 
@@ -247,6 +277,7 @@
     screen: "role", // role | pinpad | admin | cashier
     pendingRole: null,
     adminTab: "stock",
+    cashierTab: "sell",
     reportRange: "today",
     reportCustomFrom: "",
     reportCustomTo: "",
@@ -416,25 +447,33 @@
   function addToCart(id){
     var item = DATA.items.find(function(i){ return i.id === id; });
     if(!item || item.qty <= 0) return;
-    var inCart = state.cart[id] || 0;
-    if(inCart >= item.qty){ toast("No more stock left"); return; }
-    state.cart[id] = inCart + 1;
+    var entry = state.cart[id];
+    var curQty = entry ? entry.qty : 0;
+    if(curQty >= item.qty){ toast("No more stock left"); return; }
+    if(entry){ entry.qty += 1; }
+    else { state.cart[id] = { qty: 1, price: item.sellPrice }; }
     render();
   }
   function changeCartQty(id, delta){
     var item = DATA.items.find(function(i){ return i.id === id; });
-    var cur = state.cart[id] || 0;
+    var entry = state.cart[id];
+    var cur = entry ? entry.qty : 0;
     var next = cur + delta;
     if(next <= 0){ delete state.cart[id]; }
     else if(item && next > item.qty){ toast("Only " + item.qty + " in stock"); return; }
-    else { state.cart[id] = next; }
+    else { entry.qty = next; }
     render();
+  }
+  function setCartPrice(id, price){
+    var entry = state.cart[id];
+    if(!entry) return;
+    entry.price = isNaN(price) ? 0 : price;
   }
   function cartTotal(){
     var total = 0;
     Object.keys(state.cart).forEach(function(id){
-      var item = DATA.items.find(function(i){ return i.id === id; });
-      if(item) total += item.sellPrice * state.cart[id];
+      var entry = state.cart[id];
+      total += entry.price * entry.qty;
     });
     return total;
   }
@@ -446,8 +485,10 @@
     ids.forEach(function(id){
       var item = DATA.items.find(function(i){ return i.id === id; });
       if(!item) return;
-      var qty = state.cart[id];
-      lines.push({ itemId: id, name: item.name, qty: qty, sellPrice: item.sellPrice, buyPrice: item.buyPrice });
+      var entry = state.cart[id];
+      var qty = entry.qty;
+      var price = entry.price;
+      lines.push({ itemId: id, name: item.name, qty: qty, sellPrice: price, listPrice: item.sellPrice, buyPrice: item.buyPrice });
       item.qty -= qty;
     });
     var total = lines.reduce(function(s,l){ return s + l.qty*l.sellPrice; }, 0);
@@ -529,7 +570,7 @@
             '<span class="glyph">🗂️</span>'+
             '<span><span class="label">Admin</span><br><span class="sub">Full access: sell, stock &amp; reports</span></span>'+
           '</button>'+
-          '<button class="role-btn" data-role="cashier">'+
+          '<button class="role-btn cashier-btn" data-role="cashier">'+
             '<span class="glyph">🧾</span>'+
             '<span><span class="label">Cashier</span><br><span class="sub">Make a sale</span></span>'+
           '</button>'+
@@ -626,7 +667,7 @@
   function renderDebtorsTab(){
     var totalOwed = DATA.debts.reduce(function(s,d){ return s + debtBalance(d); }, 0);
     var html = '<div class="stat-grid" style="grid-template-columns:1fr;">'+
-      statCard("Total owed to you", money(totalOwed))+
+      statCard("Total owed to you", money(totalOwed), "--warn")+
       '</div>';
 
     html += '<div class="card"><h2 class="section-title">Who owes you</h2>';
@@ -662,6 +703,18 @@
     return html;
   }
 
+  function wireDebtorsTab(){
+    app.querySelectorAll("[data-pay]").forEach(function(b){
+      b.addEventListener("click", function(){ openPaymentModal(b.getAttribute("data-pay")); });
+    });
+    app.querySelectorAll("[data-deldebt]").forEach(function(b){
+      b.addEventListener("click", function(){
+        var id = b.getAttribute("data-deldebt");
+        showConfirm("Delete this debtor record? This cannot be undone.", function(){ deleteDebt(id); });
+      });
+    });
+  }
+
   function renderReportsTab(){
     var sales = filteredSales();
     var sum = reportSummary(sales);
@@ -680,10 +733,10 @@
     }
 
     html += '<div class="stat-grid">'+
-      statCard("Revenue", money(sum.revenue))+
-      statCard("Profit", money(sum.profit))+
-      statCard("Cost of goods", money(sum.cost))+
-      statCard("Sales made", String(sum.count))+
+      statCard("Revenue", money(sum.revenue), "--stat-blue")+
+      statCard("Profit", money(sum.profit), "--accent")+
+      statCard("Cost of goods", money(sum.cost), "--warn")+
+      statCard("Sales made", String(sum.count), "--stat-purple")+
       '</div>';
 
     html += '<div class="card"><h2 class="section-title">Items sold</h2>';
@@ -706,9 +759,11 @@
       html += '<div class="empty">Nothing here yet.</div>';
     } else {
       recent.forEach(function(s){
-        html += '<div class="item-row"><div>'+
-          '<div class="item-name">'+money(s.total)+'</div>'+
-          '<div class="item-meta">'+new Date(s.timestamp).toLocaleString()+' · '+s.lines.length+' item(s)</div>'+
+        var overridden = s.lines.some(function(l){ return l.listPrice !== undefined && l.sellPrice !== l.listPrice; });
+        var overrideBadge = overridden ? '<span class="pill pill-warn" style="margin-left:6px;">Price changed</span>' : "";
+        html += '<div class="item-row" data-sale="'+s.id+'" style="cursor:pointer;"><div>'+
+          '<div class="item-name">'+money(s.total)+overrideBadge+'</div>'+
+          '<div class="item-meta">'+new Date(s.timestamp).toLocaleString()+' · '+s.lines.length+' item(s)'+(s.paymentType==="credit"?" · on credit":"")+'</div>'+
         '</div><span class="pill pill-ok">+'+money(s.profit)+' profit</span></div>';
       });
     }
@@ -716,7 +771,7 @@
     return html;
   }
   function rangeBtn(id,label){ return '<button data-range="'+id+'" class="'+(state.reportRange===id?"active":"")+'">'+label+'</button>'; }
-  function statCard(label,value){ return '<div class="stat-card"><div class="label">'+label+'</div><div class="value">'+value+'</div></div>'; }
+  function statCard(label,value,colorVar){ return '<div class="stat-card" style="border-top-color:var('+(colorVar||"--accent")+')"><div class="label">'+label+'</div><div class="value">'+value+'</div></div>'; }
 
   function renderSettingsTab(){
     return '<div class="card">'+
@@ -775,17 +830,7 @@
       });
     }
 
-    if(state.adminTab === "debtors"){
-      app.querySelectorAll("[data-pay]").forEach(function(b){
-        b.addEventListener("click", function(){ openPaymentModal(b.getAttribute("data-pay")); });
-      });
-      app.querySelectorAll("[data-deldebt]").forEach(function(b){
-        b.addEventListener("click", function(){
-          var id = b.getAttribute("data-deldebt");
-          showConfirm("Delete this debtor record? This cannot be undone.", function(){ deleteDebt(id); });
-        });
-      });
-    }
+    if(state.adminTab === "debtors") wireDebtorsTab();
 
     if(state.adminTab === "reports"){
       app.querySelectorAll("[data-range]").forEach(function(b){
@@ -795,6 +840,9 @@
       var toInput = app.querySelector("#reportTo");
       if(fromInput) fromInput.addEventListener("change", function(){ state.reportCustomFrom = fromInput.value; render(); });
       if(toInput) toInput.addEventListener("change", function(){ state.reportCustomTo = toInput.value; render(); });
+      app.querySelectorAll("[data-sale]").forEach(function(row){
+        row.addEventListener("click", function(){ openSaleDetail(row.getAttribute("data-sale")); });
+      });
     }
 
     if(state.adminTab === "settings"){
@@ -877,6 +925,44 @@
     } catch(e){
       toast("Backup failed — try again");
     }
+  }
+
+  function openSaleDetail(saleId){
+    var sale = DATA.sales.find(function(s){ return s.id === saleId; });
+    if(!sale) return;
+    var backdrop = document.createElement("div");
+    backdrop.className = "modal-backdrop";
+
+    var rowsHtml = sale.lines.map(function(l){
+      var overridden = l.listPrice !== undefined && l.sellPrice !== l.listPrice;
+      var priceNote = overridden ? ' <span style="color:var(--warn);font-size:11px;">(usual '+money(l.listPrice)+')</span>' : "";
+      return '<tr>'+
+        '<td>'+esc(l.name)+'</td>'+
+        '<td class="num">'+l.qty+'</td>'+
+        '<td class="num">'+money(l.sellPrice)+priceNote+'</td>'+
+        '<td class="num">'+money(l.qty*l.sellPrice)+'</td>'+
+      '</tr>';
+    }).join("");
+
+    var cost = sale.lines.reduce(function(s,l){ return s + l.qty*l.buyPrice; }, 0);
+
+    backdrop.innerHTML = '<div class="modal-sheet">'+
+      '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
+      '<h3>Sale — '+new Date(sale.timestamp).toLocaleString()+'</h3>'+
+      (sale.paymentType === "credit" ? '<p class="muted-note">Sold on credit.</p>' : "")+
+      '<table class="report-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Subtotal</th></tr></thead><tbody>'+
+      rowsHtml+
+      '</tbody></table>'+
+      '<div class="stat-grid" style="margin-top:14px;">'+
+        statCard("Revenue", money(sale.total), "--stat-blue")+
+        statCard("Cost of goods", money(cost), "--warn")+
+        statCard("Profit", money(sale.profit), "--accent")+
+      '</div>'+
+      '</div>';
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); }
+    backdrop.querySelector(".modal-close button").addEventListener("click", close);
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
   }
 
   function openPaymentModal(id){
@@ -978,13 +1064,30 @@
       '<button class="ghost" id="logoutBtn">Log out</button>'+
       '</header><main>';
 
-    html += renderProductGridHtml();
+    html += '<div class="tabs">'+
+      '<button data-ctab="sell" class="'+(state.cashierTab==="sell"?"active":"")+'">Sell</button>'+
+      '<button data-ctab="debtors" class="'+(state.cashierTab==="debtors"?"active":"")+'">Debtors</button>'+
+      '</div>';
+
+    if(state.cashierTab === "sell") html += renderProductGridHtml();
+    if(state.cashierTab === "debtors") html += renderDebtorsTab();
+
     html += '</main>';
-    html += renderCartBarHtml();
+    if(state.cashierTab === "sell") html += renderCartBarHtml();
 
     app.innerHTML = html;
     app.querySelector("#logoutBtn").addEventListener("click", logout);
-    wireProductGrid();
+    app.querySelectorAll("[data-ctab]").forEach(function(b){
+      b.addEventListener("click", function(){ state.cashierTab = b.getAttribute("data-ctab"); render(); });
+    });
+    if(state.cashierTab === "sell") wireProductGrid();
+    if(state.cashierTab === "debtors") wireDebtorsTab();
+  }
+
+  function hueForId(str){
+    var hash = 0;
+    for(var i = 0; i < str.length; i++){ hash = str.charCodeAt(i) + ((hash << 5) - hash); }
+    return Math.abs(hash) % 360;
   }
 
   function renderProductGridHtml(){
@@ -994,7 +1097,8 @@
     var html = '<div class="product-grid">';
     DATA.items.forEach(function(item){
       var disabled = item.qty <= 0;
-      html += '<button class="product-tile'+(disabled?" disabled":"")+'" data-add="'+item.id+'" '+(disabled?"disabled":"")+'>'+
+      var hue = hueForId(item.id);
+      html += '<button class="product-tile'+(disabled?" disabled":"")+'" style="--tile-hue:'+hue+'" data-add="'+item.id+'" '+(disabled?"disabled":"")+'>'+
         '<div class="pname">'+esc(item.name)+'</div>'+
         '<div class="pprice">'+money(item.sellPrice)+'</div>'+
         '<div class="pstock">'+(disabled ? "Out of stock" : item.qty+" left")+'</div>'+
@@ -1006,7 +1110,7 @@
 
   function renderCartBarHtml(){
     var cartIds = Object.keys(state.cart);
-    var count = cartIds.reduce(function(s,id){ return s + state.cart[id]; }, 0);
+    var count = cartIds.reduce(function(s,id){ return s + state.cart[id].qty; }, 0);
     if(count === 0) return "";
     return '<div class="cart-bar">'+
       '<div class="cart-summary"><span>'+count+' item(s) in cart</span><strong>'+money(cartTotal())+'</strong></div>'+
@@ -1029,11 +1133,19 @@
     var linesHtml = ids.map(function(id){
       var item = DATA.items.find(function(i){ return i.id === id; });
       if(!item) return "";
-      var qty = state.cart[id];
+      var entry = state.cart[id];
+      var priceNote = entry.price !== item.sellPrice ? '<span style="color:var(--warn);"> (usual '+money(item.sellPrice)+')</span>' : "";
       return '<div class="cart-line">'+
-        '<div><div class="item-name">'+esc(item.name)+'</div><div class="item-meta">'+money(item.sellPrice)+' each</div></div>'+
+        '<div style="flex:1;">'+
+          '<div class="item-name">'+esc(item.name)+'</div>'+
+          '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">'+
+            '<span class="item-meta">Price each</span>'+
+            '<input type="number" inputmode="decimal" class="cart-price-input" data-price="'+id+'" value="'+entry.price+'">'+
+          '</div>'+
+          '<div class="item-meta" data-price-note-for="'+id+'" style="margin-top:2px;">'+priceNote+'</div>'+
+        '</div>'+
         '<div class="qty-stepper">'+
-          '<button data-dec="'+id+'">−</button><span>'+qty+'</span><button data-inc="'+id+'">+</button>'+
+          '<button data-dec="'+id+'">−</button><span>'+entry.qty+'</span><button data-inc="'+id+'">+</button>'+
         '</div>'+
       '</div>';
     }).join("");
@@ -1055,13 +1167,26 @@
       '<div class="modal-close"><button aria-label="Close">✕</button></div>'+
       '<h3>Cart</h3>'+
       linesHtml+
-      '<div class="cart-summary" style="margin-top:12px;"><span>Total</span><strong>'+money(cartTotal())+'</strong></div>'+
+      '<div class="cart-summary" style="margin-top:12px;"><span>Total</span><strong id="cartModalTotal">'+money(cartTotal())+'</strong></div>'+
       paymentToggleHtml+
       creditFieldsHtml+
       '<button class="btn btn-primary" id="checkoutBtn" style="margin-top:14px;">Complete sale &amp; print receipt</button>'+
       '</div>';
     document.body.appendChild(backdrop);
     function close(){ backdrop.remove(); }
+    backdrop.querySelectorAll(".cart-price-input").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var id = inp.getAttribute("data-price");
+        var item = DATA.items.find(function(i){ return i.id === id; });
+        setCartPrice(id, parseFloat(inp.value));
+        var totalEl = backdrop.querySelector("#cartModalTotal");
+        if(totalEl) totalEl.textContent = money(cartTotal());
+        var noteEl = backdrop.querySelector('[data-price-note-for="'+id+'"]');
+        if(noteEl && item){
+          noteEl.innerHTML = (state.cart[id].price !== item.sellPrice) ? '<span style="color:var(--warn);">(usual '+money(item.sellPrice)+')</span>' : "";
+        }
+      });
+    });
     function syncPaymentFieldsToState(){
       if(pay.type === "credit"){
         var n = backdrop.querySelector("#ccName");
@@ -1087,6 +1212,8 @@
       });
     });
     backdrop.querySelector("#checkoutBtn").addEventListener("click", function(){
+      var invalid = Object.keys(state.cart).some(function(id){ return !(state.cart[id].price > 0); });
+      if(invalid){ toast("Enter a valid price for every item"); return; }
       var paymentInfo = { type: pay.type };
       if(pay.type === "credit"){
         var name = backdrop.querySelector("#ccName").value.trim();
