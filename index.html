@@ -309,9 +309,43 @@
     appId: "1:470433447586:web:eb8460ae82934deab721fb"
   };
   var cloudDocRef = null;
+  var SHOP_ID_KEY = "ledgerpos_shop_id_v1";
+
+  function getSavedShopId(){ try { return localStorage.getItem(SHOP_ID_KEY); } catch(e){ return null; } }
+  function saveShopId(id){ try { localStorage.setItem(SHOP_ID_KEY, id); } catch(e){} }
+  function clearShopId(){ try { localStorage.removeItem(SHOP_ID_KEY); } catch(e){} }
+  function localKeyFor(shopId){ return STORAGE_KEY + "_" + shopId; }
+  function generateShopId(){
+    var chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid confusion
+    var id = "";
+    for(var i = 0; i < 6; i++){ id += chars.charAt(Math.floor(Math.random()*chars.length)); }
+    return id;
+  }
+
+  function loadLocalForShop(shopId){
+    try {
+      var raw = localStorage.getItem(localKeyFor(shopId));
+      if(!raw) return defaultData();
+      var parsed = JSON.parse(raw);
+      if(!parsed.items) parsed.items = [];
+      if(!parsed.sales) parsed.sales = [];
+      if(!parsed.pins) parsed.pins = { admin:"1234", cashier:"1111" };
+      if(!parsed.shopName) parsed.shopName = "My Shop";
+      if(!parsed.debts) parsed.debts = [];
+      if(!parsed.printMethod) parsed.printMethod = "rawbt";
+      if(!parsed.subscription){
+        var now = Date.now();
+        parsed.subscription = { activatedAt: now, expiresAt: now + SUBSCRIPTION_PERIOD_MS };
+      }
+      return parsed;
+    } catch(e){
+      return defaultData();
+    }
+  }
 
   function saveLocalOnly(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+    if(!currentShopId) return;
+    try { localStorage.setItem(localKeyFor(currentShopId), JSON.stringify(DATA)); }
     catch(e){ console.error("local save failed", e); }
   }
 
@@ -325,37 +359,103 @@
     }
   }
 
-  function initCloudSync(){
-    try {
-      if(typeof firebase === "undefined"){ console.error("Firebase SDK did not load"); return; }
-      if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-      var db = firebase.firestore();
-      cloudDocRef = db.collection("dukaledger").doc("shared");
+  function getFirestore(){
+    if(typeof firebase === "undefined") return null;
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    return firebase.firestore();
+  }
 
-      cloudDocRef.get().then(function(snap){
+  var cloudUnsubscribe = null;
+
+  function attachCloudListener(shopId){
+    var db = getFirestore();
+    if(!db) return;
+    cloudDocRef = db.collection("shops").doc(shopId);
+    if(cloudUnsubscribe){ try { cloudUnsubscribe(); } catch(e){} }
+    cloudUnsubscribe = cloudDocRef.onSnapshot(function(snap){
+      if(!snap.exists) return;
+      DATA = snap.data();
+      saveLocalOnly();
+      render();
+    }, function(err){ console.error("cloud sync error", err); });
+  }
+
+  // Existing device reopening a shop it already belongs to.
+  function resumeShop(shopId){
+    currentShopId = shopId;
+    DATA = loadLocalForShop(shopId);
+    state.screen = "role";
+    render();
+    try {
+      var db = getFirestore();
+      if(!db) return;
+      var ref = db.collection("shops").doc(shopId);
+      ref.get().then(function(snap){
         if(snap.exists){
           DATA = snap.data();
           saveLocalOnly();
           render();
-        } else {
-          cloudDocRef.set(DATA).catch(function(e){ console.error("initial cloud seed failed", e); });
         }
-        cloudDocRef.onSnapshot(function(snap){
-          if(!snap.exists) return;
-          DATA = snap.data();
-          saveLocalOnly();
-          render();
-        }, function(err){ console.error("cloud sync error", err); });
-      }).catch(function(e){ console.error("cloud get failed", e); });
-    } catch(e){
-      console.error("cloud init failed", e);
-    }
+        attachCloudListener(shopId);
+      }).catch(function(e){ console.error("cloud get failed", e); attachCloudListener(shopId); });
+    } catch(e){ console.error("cloud init failed", e); }
   }
 
-  var DATA = loadData();
+  // Brand new shop, first device ever (or migrating existing single-shop data).
+  function createNewShop(seedData){
+    var id = generateShopId();
+    currentShopId = id;
+    saveShopId(id);
+    DATA = seedData || defaultData();
+    saveLocalOnly();
+    state.screen = "role";
+    render();
+    try {
+      var db = getFirestore();
+      if(db){
+        db.collection("shops").doc(id).set(DATA).catch(function(e){ console.error("seed failed", e); });
+        attachCloudListener(id);
+      }
+    } catch(e){ console.error("cloud init failed", e); }
+  }
+
+  function migrateLegacyIfAny(callback){
+    var legacyRaw = null;
+    try { legacyRaw = localStorage.getItem(STORAGE_KEY); } catch(e){}
+    if(!legacyRaw){ callback(null); return; }
+    try {
+      var db = getFirestore();
+      if(db){
+        db.collection("dukaledger").doc("shared").get().then(function(snap){
+          callback(snap.exists ? snap.data() : loadData());
+        }).catch(function(){ callback(loadData()); });
+        return;
+      }
+    } catch(e){}
+    callback(loadData());
+  }
+
+  // Joining a shop an admin already set up elsewhere.
+  function joinShop(id, onFail){
+    var db = getFirestore();
+    if(!db){ if(onFail) onFail("No internet connection"); return; }
+    db.collection("shops").doc(id).get().then(function(snap){
+      if(!snap.exists){ if(onFail) onFail("Shop ID not found"); return; }
+      currentShopId = id;
+      saveShopId(id);
+      DATA = snap.data();
+      saveLocalOnly();
+      state.screen = "role";
+      render();
+      attachCloudListener(id);
+    }).catch(function(e){ if(onFail) onFail("Could not reach the server"); });
+  }
+
+  var currentShopId = null;
+  var DATA = defaultData();
 
   var state = {
-    screen: "role", // role | pinpad | admin | cashier
+    screen: "setup", // setup | role | pinpad | admin | cashier
     pendingRole: null,
     adminTab: "stock",
     cashierTab: "sell",
@@ -678,6 +778,7 @@
   var app = document.getElementById("app");
 
   function render(){
+    if(state.screen === "setup") return renderSetup();
     if(!isSubscriptionActive()) return renderLocked();
     if(state.screen === "role") return renderRole();
     if(state.screen === "admin") return renderAdmin();
@@ -707,6 +808,36 @@
       } else {
         toast("Invalid code");
       }
+    });
+  }
+
+  function renderSetup(){
+    app.innerHTML =
+      '<div class="role-screen">'+
+        '<div>'+
+          '<h1>Duka Ledger</h1>'+
+          '<p class="tag">Set up stock &amp; sales on this device.</p>'+
+        '</div>'+
+        '<div class="card" style="max-width:320px; width:100%; text-align:left;">'+
+          '<h2 class="section-title">New shop</h2>'+
+          '<p class="muted-note">First time setting up? Create a brand-new shop on this device.</p>'+
+          '<button class="btn btn-primary" id="createShopBtn" style="margin-top:10px;">Create a new shop</button>'+
+        '</div>'+
+        '<div class="card" style="max-width:320px; width:100%; text-align:left;">'+
+          '<h2 class="section-title">Join an existing shop</h2>'+
+          '<p class="muted-note">Have a Shop ID from your admin? Enter it to sync with their stock and sales.</p>'+
+          '<label class="field">Shop ID</label><input id="joinShopInput" placeholder="e.g. AB3XQ9" style="text-transform:uppercase;">'+
+          '<button class="btn btn-outline" id="joinShopBtn" style="margin-top:10px;">Join shop</button>'+
+        '</div>'+
+      '</div>';
+    app.querySelector("#createShopBtn").addEventListener("click", function(){
+      createNewShop();
+      toast("Shop created");
+    });
+    app.querySelector("#joinShopBtn").addEventListener("click", function(){
+      var id = app.querySelector("#joinShopInput").value.trim().toUpperCase();
+      if(!id){ toast("Enter a Shop ID"); return; }
+      joinShop(id, function(errMsg){ toast(errMsg); });
     });
   }
 
@@ -933,6 +1064,14 @@
         ? '<span class="pill pill-warn">'+daysLeft+' day(s) left</span>'
         : '<span class="pill pill-ok">'+daysLeft+' day(s) left</span>';
     return '<div class="card">'+
+      '<h2 class="section-title">Shop ID</h2>'+
+      '<p class="muted-note">Give this ID to a cashier\'s phone so it can join and sync with this same shop.</p>'+
+      '<div class="stat-card" style="border-top-color:var(--accent); text-align:center; margin-top:10px;">'+
+        '<div class="value" style="font-size:24px; letter-spacing:3px;">'+esc(currentShopId || "—")+'</div>'+
+      '</div>'+
+      '<button class="btn btn-outline" id="leaveShopBtn" style="margin-top:12px;">Disconnect this device from this shop</button>'+
+      '</div>'+
+      '<div class="card">'+
       '<h2 class="section-title">Subscription</h2>'+
       '<p class="muted-note">Active until '+new Date(DATA.subscription.expiresAt).toLocaleDateString()+' · '+subPill+'</p>'+
       '<label class="field">Renewal code</label><input id="settingsRenewalInput" inputmode="numeric" placeholder="6-digit code">'+
@@ -1026,6 +1165,16 @@
         var code = app.querySelector("#settingsRenewalInput").value;
         if(tryRenew(code)){ toast("Renewed — thank you!"); render(); }
         else { toast("Invalid code"); }
+      });
+      app.querySelector("#leaveShopBtn").addEventListener("click", function(){
+        showConfirm("Disconnect this device from this shop? You'll need the Shop ID to reconnect.", function(){
+          if(cloudUnsubscribe){ try { cloudUnsubscribe(); } catch(e){} cloudUnsubscribe = null; }
+          cloudDocRef = null;
+          clearShopId();
+          currentShopId = null;
+          state.screen = "setup";
+          render();
+        });
       });
       app.querySelector("#savePins").addEventListener("click", function(){
         DATA.pins.admin = app.querySelector("#adminPinInput").value.trim() || DATA.pins.admin;
@@ -1411,8 +1560,24 @@
     });
   }
 
-  render();
-  initCloudSync();
+  render(); // shows the setup/loading screen immediately
+
+  (function boot(){
+    var savedShopId = getSavedShopId();
+    if(savedShopId){
+      resumeShop(savedShopId);
+    } else {
+      migrateLegacyIfAny(function(legacyData){
+        if(legacyData){
+          createNewShop(legacyData);
+          toast("Restored your existing shop data");
+        } else {
+          state.screen = "setup";
+          render();
+        }
+      });
+    }
+  })();
 })();
 
 if("serviceWorker" in navigator){
