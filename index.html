@@ -235,24 +235,46 @@
 
   h2.section-title { font-size: 15px; margin: 4px 0 10px; }
   .muted-note { font-size:12px; color:var(--text-muted); margin-top:6px; }
+
+  #printArea { display:none; }
+  @media print {
+    body > *:not(#printArea) { display:none !important; }
+    #printArea {
+      display:block !important;
+      width: 80mm;
+      font-family: var(--mono);
+      white-space: pre-wrap;
+      font-size: 12px;
+      color: #000;
+    }
+    @page { margin: 4mm; }
+  }
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="printArea"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-firestore-compat.min.js"></script>
 <script>
 (function(){
   "use strict";
   var STORAGE_KEY = "ledgerpos_data_v1";
   var LOW_STOCK = 5;
 
+  var SUBSCRIPTION_PERIOD_MS = 90 * 24 * 3600 * 1000; // ~3 months
+
   function defaultData(){
+    var now = Date.now();
     return {
       shopName: "My Shop",
       pins: { admin: "1234", cashier: "1111" },
       items: [],
       sales: [],
-      debts: []
+      debts: [],
+      printMethod: "rawbt",
+      subscription: { activatedAt: now, expiresAt: now + SUBSCRIPTION_PERIOD_MS }
     };
   }
 
@@ -266,6 +288,11 @@
       if(!parsed.pins) parsed.pins = { admin:"1234", cashier:"1111" };
       if(!parsed.shopName) parsed.shopName = "My Shop";
       if(!parsed.debts) parsed.debts = [];
+      if(!parsed.printMethod) parsed.printMethod = "rawbt";
+      if(!parsed.subscription){
+        var now = Date.now();
+        parsed.subscription = { activatedAt: now, expiresAt: now + SUBSCRIPTION_PERIOD_MS };
+      }
       return parsed;
     } catch(e){
       console.error("load failed", e);
@@ -273,9 +300,56 @@
     }
   }
 
-  function saveData(){
+  var firebaseConfig = {
+    apiKey: "AIzaSyDfUqjeNnzuMPQa-7qLtOTaz2ZhU2yiSP0",
+    authDomain: "duka-ledger-5c89c.firebaseapp.com",
+    projectId: "duka-ledger-5c89c",
+    storageBucket: "duka-ledger-5c89c.firebasestorage.app",
+    messagingSenderId: "470433447586",
+    appId: "1:470433447586:web:eb8460ae82934deab721fb"
+  };
+  var cloudDocRef = null;
+
+  function saveLocalOnly(){
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
-    catch(e){ console.error("save failed", e); toast("Could not save — storage full or blocked"); }
+    catch(e){ console.error("local save failed", e); }
+  }
+
+  function saveData(){
+    saveLocalOnly();
+    if(cloudDocRef){
+      cloudDocRef.set(DATA).catch(function(e){
+        console.error("cloud save failed", e);
+        toast("Saved on this phone — couldn't sync (check internet)");
+      });
+    }
+  }
+
+  function initCloudSync(){
+    try {
+      if(typeof firebase === "undefined"){ console.error("Firebase SDK did not load"); return; }
+      if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      var db = firebase.firestore();
+      cloudDocRef = db.collection("dukaledger").doc("shared");
+
+      cloudDocRef.get().then(function(snap){
+        if(snap.exists){
+          DATA = snap.data();
+          saveLocalOnly();
+          render();
+        } else {
+          cloudDocRef.set(DATA).catch(function(e){ console.error("initial cloud seed failed", e); });
+        }
+        cloudDocRef.onSnapshot(function(snap){
+          if(!snap.exists) return;
+          DATA = snap.data();
+          saveLocalOnly();
+          render();
+        }, function(err){ console.error("cloud sync error", err); });
+      }).catch(function(e){ console.error("cloud get failed", e); });
+    } catch(e){
+      console.error("cloud init failed", e);
+    }
   }
 
   var DATA = loadData();
@@ -316,6 +390,39 @@
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
   function money(n){ return (Math.round(n*100)/100).toFixed(2); }
   function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+  // ---------------- subscription / licensing ----------------
+  var RENEWAL_SECRET = "SAKI-DUKA-LEDGER-2026"; // shared secret, only Sakitech's code-generator tool should know this
+  function simpleHash(str){
+    var hash = 5381;
+    for(var i = 0; i < str.length; i++){ hash = ((hash << 5) + hash) + str.charCodeAt(i); hash = hash & hash; }
+    return Math.abs(hash);
+  }
+  function periodKeyFor(date){
+    return date.getFullYear() + "-" + (date.getMonth() + 1);
+  }
+  function expectedRenewalCode(date){
+    var period = periodKeyFor(date || new Date());
+    var raw = simpleHash(RENEWAL_SECRET + period);
+    return String(raw % 900000 + 100000); // 6-digit code, valid for the calendar month it's generated in
+  }
+  function isSubscriptionActive(){
+    return Date.now() <= (DATA.subscription ? DATA.subscription.expiresAt : 0);
+  }
+  function daysLeftOnSubscription(){
+    var ms = (DATA.subscription ? DATA.subscription.expiresAt : 0) - Date.now();
+    return Math.ceil(ms / (24*3600*1000));
+  }
+  function tryRenew(code){
+    var entered = String(code || "").trim();
+    if(entered && entered === expectedRenewalCode(new Date())){
+      var base = Math.max(Date.now(), DATA.subscription ? DATA.subscription.expiresAt : 0);
+      DATA.subscription = { activatedAt: DATA.subscription ? DATA.subscription.activatedAt : Date.now(), expiresAt: base + SUBSCRIPTION_PERIOD_MS };
+      saveData();
+      return true;
+    }
+    return false;
+  }
 
   function toast(msg){
     var el = document.createElement("div");
@@ -375,6 +482,10 @@
   }
 
   function printText(text){
+    if(DATA.printMethod === "browser"){
+      printViaBrowser(text);
+      return;
+    }
     try {
       var b64 = b64EncodeUnicode(text);
       window.location.href = "rawbt:base64," + b64;
@@ -382,6 +493,13 @@
       console.error(e);
       toast("Could not reach RawBT — is it installed?");
     }
+  }
+
+  function printViaBrowser(text){
+    var area = document.getElementById("printArea");
+    if(!area){ toast("Print area not found"); return; }
+    area.textContent = text;
+    setTimeout(function(){ window.print(); }, 50);
   }
 
   function printReceipt(sale, paymentInfo){
@@ -560,9 +678,36 @@
   var app = document.getElementById("app");
 
   function render(){
+    if(!isSubscriptionActive()) return renderLocked();
     if(state.screen === "role") return renderRole();
     if(state.screen === "admin") return renderAdmin();
     if(state.screen === "cashier") return renderCashier();
+  }
+
+  function renderLocked(){
+    var overdueDays = Math.abs(daysLeftOnSubscription());
+    app.innerHTML =
+      '<div class="role-screen">'+
+        '<div>'+
+          '<h1>Subscription expired</h1>'+
+          '<p class="tag">'+esc(DATA.shopName || "My Shop")+'\'s Duka Ledger subscription ended '+overdueDays+' day(s) ago.</p>'+
+        '</div>'+
+        '<div class="card" style="max-width:320px; width:100%;">'+
+          '<p class="muted-note">Contact Sakitech Solutions to renew: <strong>0724335960</strong></p>'+
+          '<label class="field">Renewal code</label>'+
+          '<input id="renewalCodeInput" inputmode="numeric" placeholder="6-digit code">'+
+          '<button class="btn btn-primary" id="renewalGoBtn" style="margin-top:14px;">Activate</button>'+
+        '</div>'+
+      '</div>';
+    app.querySelector("#renewalGoBtn").addEventListener("click", function(){
+      var code = app.querySelector("#renewalCodeInput").value;
+      if(tryRenew(code)){
+        toast("Renewed — thank you!");
+        render();
+      } else {
+        toast("Invalid code");
+      }
+    });
   }
 
   function renderRole(){
@@ -781,7 +926,19 @@
   function statCard(label,value,colorVar){ return '<div class="stat-card" style="border-top-color:var('+(colorVar||"--accent")+')"><div class="label">'+label+'</div><div class="value">'+value+'</div></div>'; }
 
   function renderSettingsTab(){
+    var daysLeft = daysLeftOnSubscription();
+    var subPill = daysLeft <= 7
+      ? '<span class="pill pill-danger">'+daysLeft+' day(s) left</span>'
+      : daysLeft <= 21
+        ? '<span class="pill pill-warn">'+daysLeft+' day(s) left</span>'
+        : '<span class="pill pill-ok">'+daysLeft+' day(s) left</span>';
     return '<div class="card">'+
+      '<h2 class="section-title">Subscription</h2>'+
+      '<p class="muted-note">Active until '+new Date(DATA.subscription.expiresAt).toLocaleDateString()+' · '+subPill+'</p>'+
+      '<label class="field">Renewal code</label><input id="settingsRenewalInput" inputmode="numeric" placeholder="6-digit code">'+
+      '<button class="btn btn-outline" id="settingsRenewalBtn" style="margin-top:10px;">Apply renewal code</button>'+
+      '</div>'+
+      '<div class="card">'+
       '<h2 class="section-title">Shop details</h2>'+
       '<label class="field">Shop name (shown on receipts)</label><input id="shopNameInput" value="'+esc(DATA.shopName)+'">'+
       '<button class="btn btn-outline" id="saveShopName" style="margin-top:12px;">Save name</button>'+
@@ -794,8 +951,16 @@
       '</div>'+
       '<div class="card">'+
       '<h2 class="section-title">Printer</h2>'+
-      '<p class="muted-note">Make sure RawBT is installed and your thermal printer is paired in the RawBT app before testing.</p>'+
-      '<button class="btn btn-primary" id="testPrintBtn">Send test print to RawBT</button>'+
+      '<label class="field">How should receipts print?</label>'+
+      '<div class="tabs" style="margin-bottom:4px;">'+
+        '<button data-printmethod="rawbt" class="'+(DATA.printMethod==="rawbt"?"active":"")+'">RawBT (phone)</button>'+
+        '<button data-printmethod="browser" class="'+(DATA.printMethod==="browser"?"active":"")+'">This device (browser print)</button>'+
+      '</div>'+
+      (DATA.printMethod === "browser"
+        ? '<p class="muted-note">Uses your computer\'s normal print dialog \u2014 pick your connected thermal printer there, same as printing any document.</p>'
+        : '<p class="muted-note">Make sure RawBT is installed and your thermal printer is paired in the RawBT app before testing.</p>'
+      )+
+      '<button class="btn btn-primary" id="testPrintBtn" style="margin-top:10px;">Send test print</button>'+
       '</div>'+
       '<div class="card">'+
       '<h2 class="section-title">Backup &amp; restore</h2>'+
@@ -857,13 +1022,25 @@
         DATA.shopName = app.querySelector("#shopNameInput").value.trim() || "My Shop";
         saveData(); toast("Saved"); render();
       });
+      app.querySelector("#settingsRenewalBtn").addEventListener("click", function(){
+        var code = app.querySelector("#settingsRenewalInput").value;
+        if(tryRenew(code)){ toast("Renewed — thank you!"); render(); }
+        else { toast("Invalid code"); }
+      });
       app.querySelector("#savePins").addEventListener("click", function(){
         DATA.pins.admin = app.querySelector("#adminPinInput").value.trim() || DATA.pins.admin;
         DATA.pins.cashier = app.querySelector("#cashierPinInput").value.trim() || DATA.pins.cashier;
         saveData(); toast("PINs updated");
       });
       app.querySelector("#testPrintBtn").addEventListener("click", function(){
-        printText(center(DATA.shopName,32)+"\n"+lineChar("-",32)+"\nRawBT test print\n"+new Date().toLocaleString()+"\n\n"+lineChar("-",32)+"\n"+center("Developed by Sakitech",32)+"\n"+center("Solutions",32)+"\n"+center("0724335960",32)+"\n\n\n");
+        printText(center(DATA.shopName,32)+"\n"+lineChar("-",32)+"\nTest print\n"+new Date().toLocaleString()+"\n\n"+lineChar("-",32)+"\n"+center("Developed by Sakitech",32)+"\n"+center("Solutions",32)+"\n"+center("0724335960",32)+"\n\n\n");
+      });
+      app.querySelectorAll("[data-printmethod]").forEach(function(b){
+        b.addEventListener("click", function(){
+          DATA.printMethod = b.getAttribute("data-printmethod");
+          saveData();
+          render();
+        });
       });
       app.querySelector("#backupBtn").addEventListener("click", doBackup);
       app.querySelector("#restoreBtn").addEventListener("click", function(){
@@ -1235,6 +1412,7 @@
   }
 
   render();
+  initCloudSync();
 })();
 
 if("serviceWorker" in navigator){
